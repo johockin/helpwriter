@@ -41,7 +41,7 @@ export default function Home() {
   const [title, setTitle] = useState<string>('Untitled Document');
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -99,6 +99,8 @@ export default function Home() {
       } else {
         createNewProject();
       }
+      // Ensure sidebar is collapsed on initial load
+      setIsSidebarCollapsed(true);
     } catch (error) {
       console.error('Error loading projects:', error);
       createNewProject();
@@ -200,6 +202,8 @@ export default function Home() {
       setTitle(project.title);
       setOutline(project.outline);
       setChatHistory(project.chatHistory);
+      // Collapse sidebar after loading project
+      setIsSidebarCollapsed(true);
     }
   };
 
