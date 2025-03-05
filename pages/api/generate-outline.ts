@@ -186,7 +186,7 @@ export default async function handler(
       systemInstructions, 
       technicalInstructions,
       customInstructions,
-      isDocumentRequest = false  // New flag to distinguish between chat and document requests
+      isDocumentRequest = false
     } = req.body;
 
     if (!prompt) {
@@ -227,59 +227,74 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
       }
     ];
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-0125-preview",
-      messages,
-      temperature: 0.7,
-      max_tokens: 1500,
-    });
-
-    const responseContent = completion.choices[0].message.content || '';
-    
-    // Only process title and outline for document requests
-    if (isDocumentRequest) {
-      let outline = responseContent;
-      let suggestedTitle: string | null = null;
-      
-      // Look for title suggestions in various formats
-      const titlePatterns = [
-        /Suggested Title:([^\n]+)/i,
-        /Title:([^\n]+)/i,
-        /Proposed Title:([^\n]+)/i,
-        /Document Title:([^\n]+)/i
-      ];
-
-      for (const pattern of titlePatterns) {
-        const match = responseContent.match(pattern);
-        if (match) {
-          suggestedTitle = formatTitle(match[1].trim());
-          // Remove the title line from the outline
-          outline = responseContent.replace(pattern, '').trim();
-          break;
-        }
-      }
-
-      // If no explicit title suggestion found, try to extract one from the first line
-      if (!suggestedTitle && !currentTitle) {
-        const firstLine = outline.split('\n')[0].trim();
-        if (firstLine && !firstLine.startsWith('-') && !firstLine.startsWith('•')) {
-          suggestedTitle = formatTitle(firstLine);
-          outline = outline.split('\n').slice(1).join('\n').trim();
-        }
-      }
-
-      return res.status(200).json({ 
-        outline,
-        suggestedTitle 
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-0125-preview",
+        messages,
+        temperature: 0.7,
+        max_tokens: 1500,
       });
-    } else {
-      // For chat interactions, just return the response content
-      return res.status(200).json({
-        chatResponse: responseContent
+
+      if (!completion.choices[0]?.message?.content) {
+        throw new Error('No response content received from OpenAI');
+      }
+
+      const responseContent = completion.choices[0].message.content;
+      
+      // Only process title and outline for document requests
+      if (isDocumentRequest) {
+        let outline = responseContent;
+        let suggestedTitle: string | null = null;
+        
+        // Look for title suggestions in various formats
+        const titlePatterns = [
+          /Suggested Title:([^\n]+)/i,
+          /Title:([^\n]+)/i,
+          /Proposed Title:([^\n]+)/i,
+          /Document Title:([^\n]+)/i
+        ];
+
+        for (const pattern of titlePatterns) {
+          const match = responseContent.match(pattern);
+          if (match) {
+            suggestedTitle = formatTitle(match[1].trim());
+            // Remove the title line from the outline
+            outline = responseContent.replace(pattern, '').trim();
+            break;
+          }
+        }
+
+        // If no explicit title suggestion found, try to extract one from the first line
+        if (!suggestedTitle && !currentTitle) {
+          const firstLine = outline.split('\n')[0].trim();
+          if (firstLine && !firstLine.startsWith('-') && !firstLine.startsWith('•')) {
+            suggestedTitle = formatTitle(firstLine);
+            outline = outline.split('\n').slice(1).join('\n').trim();
+          }
+        }
+
+        return res.status(200).json({ 
+          outline,
+          suggestedTitle 
+        });
+      } else {
+        // For chat interactions, just return the response content
+        return res.status(200).json({
+          chatResponse: responseContent
+        });
+      }
+    } catch (apiError: any) {
+      console.error('OpenAI API Error:', apiError);
+      return res.status(500).json({ 
+        error: 'Error communicating with OpenAI',
+        details: apiError.message || 'Unknown API error'
       });
     }
-  } catch (error) {
-    console.error('Error:', error);
-    return res.status(500).json({ error: 'Error generating response' });
+  } catch (error: any) {
+    console.error('Server Error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message || 'Unknown error occurred'
+    });
   }
 } 
