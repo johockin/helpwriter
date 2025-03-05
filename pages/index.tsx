@@ -801,7 +801,7 @@ export default function Home() {
         <main className={`flex-1 px-8 pt-32 pb-4 relative z-0 transition-all ease-in-out duration-700 ${isSidebarCollapsed ? 'ml-0' : 'ml-72'}`}>
           <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-6rem)]">
             {/* Left Panel */}
-            <div className="lg:w-1/4 flex flex-col space-y-3">
+            <div className="lg:w-1/3 flex flex-col space-y-3">
               {/* Custom Instructions */}
               <div className="bg-tactical-earth-800/95 backdrop-blur-md rounded-xl shadow-xl shadow-black/20 overflow-hidden border border-tactical-sand-500/20">
                 <div className="p-3">
@@ -916,7 +916,7 @@ export default function Home() {
             </div>
 
             {/* Right Panel: Document Outline */}
-            <div className="lg:w-3/4 flex flex-col bg-tactical-earth-800/95 backdrop-blur-md rounded-xl shadow-xl shadow-black/20 overflow-hidden border border-tactical-sand-500/20">
+            <div className="lg:w-2/3 flex flex-col bg-tactical-earth-800/95 backdrop-blur-md rounded-xl shadow-xl shadow-black/20 overflow-hidden border border-tactical-sand-500/20">
               <div className="p-5 border-b border-tactical-sand-500/20">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-4">

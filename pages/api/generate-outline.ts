@@ -18,14 +18,24 @@ const initializeOpenAI = () => {
 
 // Add retry logic for OpenAI API calls
 const retryOpenAICall = async (fn: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+  let lastError;
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      // Add timeout to the API call
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 30000)
+      );
+      
+      const resultPromise = fn();
+      const result = await Promise.race([resultPromise, timeoutPromise]);
+      return result;
     } catch (error) {
+      lastError = error;
       console.error(`OpenAI API call failed (attempt ${attempt}/${maxRetries}):`, error);
       
       if (attempt === maxRetries) {
-        throw error;
+        break;
       }
       
       // Check if error is retryable
@@ -35,12 +45,22 @@ const retryOpenAICall = async (fn: () => Promise<any>, maxRetries = 3, delay = 1
         if (status === 401 || status === 400) {
           throw error;
         }
+        
+        // Add exponential backoff for rate limits
+        if (status === 429) {
+          const retryAfter = parseInt((error as any).headers?.['retry-after'] || '30');
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          continue;
+        }
       }
       
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+      // Wait before retrying with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt - 1)));
     }
   }
+  
+  // If we've exhausted all retries, throw the last error
+  throw lastError;
 };
 
 const defaultStyleInstructions = `Let's have a conversation about your writing! I'd love to understand your creative vision and preferences better.
@@ -204,16 +224,23 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  // Add request timeout
+  const timeout = setTimeout(() => {
+    res.status(504).json({ error: 'Request timeout' });
+  }, 60000); // 60 second timeout
 
   try {
+    if (req.method !== 'POST') {
+      clearTimeout(timeout);
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
     // Initialize OpenAI with enhanced error handling
     let openai;
     try {
       openai = initializeOpenAI();
     } catch (error) {
+      clearTimeout(timeout);
       console.error('OpenAI Initialization Error:', error);
       return res.status(500).json({
         error: error instanceof Error ? error.message : 'Failed to initialize OpenAI',
@@ -279,15 +306,23 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
 
     console.log('Sending request to OpenAI...');
     
-    // Use retry logic for the API call
-    const completion = await retryOpenAICall(async () => {
-      return await openai.chat.completions.create({
-        model: "gpt-4-0125-preview",
-        messages,
-        temperature: 0.7,
-        max_tokens: 1500,
+    // Use retry logic for the API call with proper error handling
+    let completion;
+    try {
+      completion = await retryOpenAICall(async () => {
+        return await openai.chat.completions.create({
+          model: "gpt-4-0125-preview",
+          messages,
+          temperature: 0.7,
+          max_tokens: 1500,
+        });
       });
-    });
+    } catch (error) {
+      clearTimeout(timeout);
+      throw error; // Let the outer catch block handle this
+    }
+
+    clearTimeout(timeout); // Clear timeout on success
 
     const responseContent = completion.choices[0].message.content || '';
     console.log('Received response from OpenAI');
@@ -331,6 +366,7 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
       });
     }
   } catch (error) {
+    clearTimeout(timeout); // Clear timeout on error
     console.error('API Error:', error);
     
     // Determine the appropriate status code
@@ -348,6 +384,9 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
       } else if (status === 400) {
         statusCode = 400;
         errorMessage = 'Invalid request. Please check your input and try again.';
+      } else if (error.message === 'Request timeout') {
+        statusCode = 504;
+        errorMessage = 'The request timed out. Please try again.';
       }
       
       // Include the original error message if available
