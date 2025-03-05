@@ -10,7 +10,7 @@ body {
 
 @layer components {
   .chat-message {
-    @apply whitespace-pre-wrap font-mono text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl leading-relaxed sm:leading-relaxed md:leading-relaxed lg:leading-relaxed xl:leading-relaxed;
+    @apply whitespace-pre-wrap font-mono text-sm sm:text-sm md:text-base lg:text-base leading-relaxed;
   }
 }
 

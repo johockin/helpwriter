@@ -41,7 +41,7 @@ export default function Home() {
   const [title, setTitle] = useState<string>('Untitled Document');
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -99,8 +99,6 @@ export default function Home() {
       } else {
         createNewProject();
       }
-      // Ensure sidebar is collapsed on initial load
-      setIsSidebarCollapsed(true);
     } catch (error) {
       console.error('Error loading projects:', error);
       createNewProject();
@@ -202,8 +200,6 @@ export default function Home() {
       setTitle(project.title);
       setOutline(project.outline);
       setChatHistory(project.chatHistory);
-      // Collapse sidebar after loading project
-      setIsSidebarCollapsed(true);
     }
   };
 
@@ -825,7 +821,7 @@ export default function Home() {
                           className={`flex ${chat.sender === 'ai' ? 'justify-start' : 'justify-end'} mb-4`}
                         >
                           <div
-                            className={`max-w-[85%] p-4 sm:p-5 md:p-6 rounded-xl shadow-lg relative ${
+                            className={`max-w-[85%] p-4 rounded-xl shadow-lg relative ${
                               chat.sender === 'ai'
                                 ? 'bg-tactical-earth-600/95 text-tactical-sand-100 border border-tactical-sand-500/30'
                                 : 'bg-tactical-earth-500/95 text-tactical-sand-100 border border-tactical-sand-500/40'
@@ -839,7 +835,7 @@ export default function Home() {
                                 {new Date(chat.timestamp).toLocaleTimeString()}
                               </div>
                             </div>
-                            <div className="chat-message p-2 sm:p-3 md:p-4">{chat.message}</div>
+                            <div className="chat-message">{chat.message}</div>
                           </div>
                         </div>
                       ))}
@@ -852,7 +848,7 @@ export default function Home() {
                   <div className="flex gap-3">
                     <textarea
                       ref={inputRef}
-                      className="flex-1 p-2.5 bg-tactical-earth-800/90 border border-tactical-sand-500/30 rounded-lg resize-y focus:outline-none focus:ring-1 focus:ring-tactical-sand-500/40 text-tactical-sand-100 text-xs transition-all placeholder-tactical-sand-300 font-mono min-h-[40px] max-h-[120px]"
+                      className="flex-1 p-3 bg-tactical-earth-800/90 border border-tactical-sand-500/30 rounded-lg resize-y focus:outline-none focus:ring-1 focus:ring-tactical-sand-500/40 text-tactical-sand-100 text-base transition-all placeholder-tactical-sand-300 font-mono min-h-[40px] max-h-[120px]"
                       value={input}
                       onChange={(e) => {
                         setInput(e.target.value);
