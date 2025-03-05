@@ -6,6 +6,8 @@ import DeleteConfirmDialog from './components/DeleteConfirmDialog';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useDeviceDetection } from '../utils/deviceDetection';
+import MobileLayout from '../components/MobileLayout';
 
 const MDEditor = dynamic(
   () => import('@uiw/react-md-editor'),
@@ -47,6 +49,8 @@ export default function Home() {
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(true);
+
+  const { isMobile } = useDeviceDetection();
 
   // Focus input on mount
   useEffect(() => {
@@ -512,6 +516,34 @@ export default function Home() {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatHistory]);
+
+  if (isMobile) {
+    return (
+      <MobileLayout
+        projects={projects}
+        currentProjectId={currentProjectId}
+        title={title}
+        outline={outline}
+        chatHistory={chatHistory}
+        input={input}
+        isLoading={isLoading}
+        onProjectSelect={(projectId) => {
+          const project = projects.find(p => p.id === projectId);
+          if (project) {
+            setCurrentProjectId(projectId);
+            setTitle(project.title);
+            setOutline(project.outline);
+            setChatHistory(project.chatHistory);
+          }
+        }}
+        onTitleChange={setTitle}
+        onOutlineChange={handleOutlineChange}
+        onInputChange={setInput}
+        onSend={handleSend}
+        createNewProject={createNewProject}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-tactical-earth-900 via-tactical-earth-800 to-tactical-earth-900">

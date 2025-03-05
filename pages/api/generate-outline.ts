@@ -6,60 +6,58 @@ const initializeOpenAI = () => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.error('OpenAI API Key Error: Key not found in environment variables');
-    throw new Error('OpenAI API key is not configured. Please check your environment variables in both development (.env.local) and production (Netlify) environments.');
+    throw new Error('OpenAI API key is not configured');
   }
-  try {
-    return new OpenAI({ apiKey });
-  } catch (error) {
-    console.error('OpenAI Client Error:', error);
-    throw new Error('Failed to initialize OpenAI client. Please check your API key configuration.');
-  }
+
+  // Create OpenAI client with optimized settings
+  return new OpenAI({ 
+    apiKey,
+    maxRetries: 3,
+    timeout: 30000,
+    defaultHeaders: {
+      'User-Agent': 'HelpWriter/1.0',
+    },
+    defaultQuery: {
+      'api-version': '2024-02',
+    },
+  });
 };
 
-// Add retry logic for OpenAI API calls
-const retryOpenAICall = async (fn: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+// Add retry logic for OpenAI API calls with optimized timing
+const retryOpenAICall = async (fn: () => Promise<any>, maxRetries = 2, initialDelay = 500) => {
   let lastError;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Add timeout to the API call
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout')), 30000)
-      );
-      
-      const resultPromise = fn();
-      const result = await Promise.race([resultPromise, timeoutPromise]);
+      const result = await fn();
       return result;
     } catch (error) {
       lastError = error;
       console.error(`OpenAI API call failed (attempt ${attempt}/${maxRetries}):`, error);
       
-      if (attempt === maxRetries) {
-        break;
-      }
+      if (attempt === maxRetries) break;
       
       // Check if error is retryable
       if (error instanceof Error) {
         const status = (error as any).status;
-        // Don't retry on 401 (unauthorized) or 400 (bad request)
-        if (status === 401 || status === 400) {
-          throw error;
-        }
+        if (status === 401 || status === 400) throw error;
         
-        // Add exponential backoff for rate limits
+        // Handle rate limits
         if (status === 429) {
-          const retryAfter = parseInt((error as any).headers?.['retry-after'] || '30');
+          const retryAfter = parseInt((error as any).headers?.['retry-after'] || '5');
           await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
           continue;
         }
       }
       
-      // Wait before retrying with exponential backoff
-      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt - 1)));
+      // Exponential backoff with jitter
+      const jitter = Math.random() * 200;
+      await new Promise(resolve => 
+        setTimeout(resolve, (initialDelay * Math.pow(2, attempt - 1)) + jitter)
+      );
     }
   }
   
-  // If we've exhausted all retries, throw the last error
   throw lastError;
 };
 
@@ -220,18 +218,19 @@ const formatTitle = (title: string): string => {
     .join(' ');
 };
 
+// Add Netlify background function support
+export const config = {
+  type: "experimental-background",
+  maxDuration: 300
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Add request timeout
-  const timeout = setTimeout(() => {
-    res.status(504).json({ error: 'Request timeout' });
-  }, 60000); // 60 second timeout
-
+  // Remove the timeout since we're using background functions
   try {
     if (req.method !== 'POST') {
-      clearTimeout(timeout);
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
@@ -240,7 +239,6 @@ export default async function handler(
     try {
       openai = initializeOpenAI();
     } catch (error) {
-      clearTimeout(timeout);
       console.error('OpenAI Initialization Error:', error);
       return res.status(500).json({
         error: error instanceof Error ? error.message : 'Failed to initialize OpenAI',
@@ -318,11 +316,8 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
         });
       });
     } catch (error) {
-      clearTimeout(timeout);
       throw error; // Let the outer catch block handle this
     }
-
-    clearTimeout(timeout); // Clear timeout on success
 
     const responseContent = completion.choices[0].message.content || '';
     console.log('Received response from OpenAI');
@@ -366,7 +361,6 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
       });
     }
   } catch (error) {
-    clearTimeout(timeout); // Clear timeout on error
     console.error('API Error:', error);
     
     // Determine the appropriate status code
