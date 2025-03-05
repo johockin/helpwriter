@@ -6,8 +6,6 @@ const nextConfig = {
       allowedOrigins: ['localhost:3000', 'helpwriter.netlify.app'],
     },
   },
-  // Optimize for Netlify
-  target: 'serverless',
   // Increase build output compression
   compress: true,
   // Optimize images
