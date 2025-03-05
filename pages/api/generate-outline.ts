@@ -3,10 +3,12 @@ import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
 interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  sender?: string;
+  id?: string;
+  sender?: 'user' | 'ai';
   message?: string;
+  timestamp?: number;
+  role?: 'user' | 'assistant' | 'system';
+  content?: string;
 }
 
 interface RequestBody {
@@ -15,6 +17,10 @@ interface RequestBody {
   currentTitle?: string;
   chatHistory?: ChatMessage[];
   isDocumentRequest?: boolean;
+  styleInstructions?: string;
+  systemInstructions?: string;
+  technicalInstructions?: string;
+  customInstructions?: string;
 }
 
 export const config = {
@@ -32,7 +38,7 @@ const getOpenAIClient = () => {
 };
 
 // Helper function to validate request body
-const validateRequest = (body: RequestBody): Required<RequestBody> => {
+const validateRequest = (body: RequestBody): Required<Omit<RequestBody, 'styleInstructions' | 'systemInstructions' | 'technicalInstructions' | 'customInstructions'>> => {
   if (!body) {
     throw new Error('Request body is required');
   }
@@ -47,17 +53,19 @@ const validateRequest = (body: RequestBody): Required<RequestBody> => {
 
   // Convert chat history format if needed
   const chatHistory = (body.chatHistory || []).map(msg => {
-    // Handle both {sender, message} and {role, content} formats
-    if ('sender' in msg && 'message' in msg) {
+    if (msg.sender && msg.message) {
       return {
         role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
-        content: msg.message as string
+        content: msg.message
       };
     }
-    return {
-      role: msg.role || 'user',
-      content: msg.content
-    };
+    if (msg.role && msg.content) {
+      return {
+        role: msg.role,
+        content: msg.content
+      };
+    }
+    throw new Error('Invalid chat message format');
   });
 
   return {
@@ -97,8 +105,8 @@ export default async function handler(req: NextRequest) {
     const formattedChatHistory: ChatCompletionMessageParam[] = chatHistory
       .slice(-10)
       .map(msg => ({
-        role: msg.role,
-        content: msg.content
+        role: msg.role || 'user',
+        content: msg.content || msg.message || ''
       }));
 
     // Construct messages array
@@ -144,13 +152,24 @@ export default async function handler(req: NextRequest) {
       max_tokens: 2000,
     });
 
-    return new Response(JSON.stringify({ 
-      result: completion.choices[0].message.content,
-      usage: completion.usage
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // Format response based on request type
+    if (isDocumentRequest) {
+      return new Response(JSON.stringify({ 
+        outline: completion.choices[0].message.content,
+        suggestedTitle: null // We'll handle title suggestions separately if needed
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else {
+      return new Response(JSON.stringify({ 
+        chatResponse: completion.choices[0].message.content,
+        usage: completion.usage
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
   } catch (error: any) {
     console.error('Error in generate-outline:', error);
