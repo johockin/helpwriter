@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 
-// Initialize OpenAI with error handling
+// Initialize OpenAI with error handling and retry logic
 const initializeOpenAI = () => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -13,6 +13,33 @@ const initializeOpenAI = () => {
   } catch (error) {
     console.error('OpenAI Client Error:', error);
     throw new Error('Failed to initialize OpenAI client. Please check your API key configuration.');
+  }
+};
+
+// Add retry logic for OpenAI API calls
+const retryOpenAICall = async (fn: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      console.error(`OpenAI API call failed (attempt ${attempt}/${maxRetries}):`, error);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Check if error is retryable
+      if (error instanceof Error) {
+        const status = (error as any).status;
+        // Don't retry on 401 (unauthorized) or 400 (bad request)
+        if (status === 401 || status === 400) {
+          throw error;
+        }
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
   }
 };
 
@@ -251,11 +278,15 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
     ];
 
     console.log('Sending request to OpenAI...');
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-0125-preview",
-      messages,
-      temperature: 0.7,
-      max_tokens: 1500,
+    
+    // Use retry logic for the API call
+    const completion = await retryOpenAICall(async () => {
+      return await openai.chat.completions.create({
+        model: "gpt-4-0125-preview",
+        messages,
+        temperature: 0.7,
+        max_tokens: 1500,
+      });
     });
 
     const responseContent = completion.choices[0].message.content || '';
@@ -301,10 +332,33 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
     }
   } catch (error) {
     console.error('API Error:', error);
+    
+    // Determine the appropriate status code
+    let statusCode = 502; // Default to bad gateway
+    let errorMessage = 'An unexpected error occurred while processing your request.';
+    
+    if (error instanceof Error) {
+      const status = (error as any).status;
+      if (status === 401) {
+        statusCode = 401;
+        errorMessage = 'Invalid API key. Please check your OpenAI API key configuration.';
+      } else if (status === 429) {
+        statusCode = 429;
+        errorMessage = 'Rate limit exceeded. Please try again in a moment.';
+      } else if (status === 400) {
+        statusCode = 400;
+        errorMessage = 'Invalid request. Please check your input and try again.';
+      }
+      
+      // Include the original error message if available
+      errorMessage = error.message || errorMessage;
+    }
+    
     // Send a more detailed error response
-    return res.status(502).json({
-      error: error instanceof Error ? error.message : 'An unexpected error occurred',
-      details: error instanceof Error ? error.stack : undefined
+    return res.status(statusCode).json({
+      error: errorMessage,
+      details: error instanceof Error ? error.stack : undefined,
+      retryAfter: statusCode === 429 ? 30 : undefined // Suggest retry after 30 seconds for rate limits
     });
   }
 } 
