@@ -49,45 +49,31 @@ export default function Dialog({
   if (!isOpen) return null;
 
   const getColors = () => {
-    switch (type) {
-      case 'danger':
-      case 'delete':
-        return {
-          primary: '#ff4c2c',
-          border: 'border-[#ff4c2c]/20',
-          bg: 'bg-[#ff4c2c]/10',
-          hover: 'hover:bg-[#ff4c2c]/20',
-          text: 'text-[#ff4c2c]'
-        };
-      case 'info':
-        return {
-          primary: '#60a5fa',
-          border: 'border-blue-500/20',
-          bg: 'bg-blue-500/10',
-          hover: 'hover:bg-blue-500/20',
-          text: 'text-blue-400'
-        };
-      default:
-        return {
-          primary: '#fbbf24',
-          border: 'border-amber-500/20',
-          bg: 'bg-amber-500/10',
-          hover: 'hover:bg-amber-500/20',
-          text: 'text-amber-400'
-        };
-    }
+    const colorType = type === 'delete' ? 'danger' : type;
+    return {
+      primary: `text-tactical-${colorType}-primary`,
+      border: `border-tactical-${colorType}-light`,
+      bg: `bg-tactical-${colorType}-light`,
+      hover: `hover:bg-tactical-${colorType}-medium`,
+      text: `text-tactical-${colorType}-primary`,
+      gradient: {
+        from: `from-tactical-${colorType}-light`,
+        via: `via-tactical-${colorType}-medium`,
+        to: `to-tactical-${colorType}-light`
+      }
+    };
   };
 
   const getIcon = () => {
     switch (icon || type) {
       case 'reset':
-        return <FiRotateCcw className="w-5 h-5" style={{ color: getColors().primary }} />;
+        return <FiRotateCcw className="w-5 h-5" />;
       case 'back':
-        return <FiArrowLeft className="w-5 h-5" style={{ color: getColors().primary }} />;
+        return <FiArrowLeft className="w-5 h-5" />;
       case 'delete':
-        return <FiTrash2 className="w-5 h-5" style={{ color: getColors().primary }} />;
+        return <FiTrash2 className="w-5 h-5" />;
       default:
-        return <FiAlertTriangle className="w-5 h-5" style={{ color: getColors().primary }} />;
+        return <FiAlertTriangle className="w-5 h-5" />;
     }
   };
 
@@ -110,7 +96,7 @@ export default function Dialog({
       >
         <div className={`relative bg-tactical-earth-800/90 rounded-xl ${colors.border} overflow-hidden`}>
           {/* Status Bar */}
-          <div className={`h-1 w-full bg-gradient-to-r from-[${colors.primary}]/20 via-[${colors.primary}]/40 to-[${colors.primary}]/20`} />
+          <div className={`h-1 w-full bg-gradient-to-r ${colors.gradient.from} ${colors.gradient.via} ${colors.gradient.to}`} />
           
           {/* Header */}
           <div className={`p-6 border-b ${colors.border}`}>
@@ -118,7 +104,7 @@ export default function Dialog({
               <div className="relative">
                 <div className={`absolute inset-0 ${colors.bg} blur-sm rounded-lg`} />
                 <div className={`bg-tactical-earth-700/50 p-2.5 rounded-lg ${colors.border} relative`}>
-                  {getIcon()}
+                  <div className={colors.primary}>{getIcon()}</div>
                 </div>
               </div>
               <div className="flex flex-col">
@@ -134,8 +120,8 @@ export default function Dialog({
               {projectTitle && (
                 <div className="text-tactical-sand-100 font-mono text-sm">
                   Are you sure you want to delete project:
-                  <div className="mt-2 p-3 bg-tactical-earth-700/50 rounded-lg border border-[#ff4c2c]/20">
-                    <code className="text-[#ff4c2c]">{projectTitle}</code>
+                  <div className="mt-2 p-3 bg-tactical-earth-700/50 rounded-lg border border-tactical-danger-light">
+                    <code className="text-tactical-danger-primary">{projectTitle}</code>
                   </div>
                 </div>
               )}
@@ -143,7 +129,7 @@ export default function Dialog({
               {message && (
                 <div className={`${colors.bg} ${colors.border} rounded-lg p-4`}>
                   <div className="flex items-start gap-3">
-                    {getIcon()}
+                    <div className={colors.primary}>{getIcon()}</div>
                     <div className="text-sm text-tactical-sand-200">
                       {message}
                     </div>
@@ -172,7 +158,7 @@ export default function Dialog({
                   onClick={onConfirm}
                   className={`flex items-center gap-2 px-4 py-2 ${colors.bg} ${colors.hover} ${colors.border} rounded-lg text-sm font-mono ${colors.text} transition-all`}
                 >
-                  {getIcon()}
+                  <div className={colors.primary}>{getIcon()}</div>
                   {finalConfirmText}
                 </button>
               </div>
@@ -181,12 +167,12 @@ export default function Dialog({
 
           {/* Corner Decorations */}
           <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden pointer-events-none">
-            <div className={`absolute top-0 right-0 w-[1px] h-8 bg-gradient-to-b from-[${colors.primary}]/0 via-[${colors.primary}]/20 to-[${colors.primary}]/0`} />
-            <div className={`absolute top-0 right-0 h-[1px] w-8 bg-gradient-to-l from-[${colors.primary}]/0 via-[${colors.primary}]/20 to-[${colors.primary}]/0`} />
+            <div className={`absolute top-0 right-0 w-[1px] h-8 bg-gradient-to-b ${colors.gradient.from} ${colors.gradient.via} ${colors.gradient.to}`} />
+            <div className={`absolute top-0 right-0 h-[1px] w-8 bg-gradient-to-l ${colors.gradient.from} ${colors.gradient.via} ${colors.gradient.to}`} />
           </div>
           <div className="absolute bottom-0 left-0 w-16 h-16 overflow-hidden pointer-events-none">
-            <div className={`absolute bottom-0 left-0 w-[1px] h-8 bg-gradient-to-t from-[${colors.primary}]/0 via-[${colors.primary}]/20 to-[${colors.primary}]/0`} />
-            <div className={`absolute bottom-0 left-0 h-[1px] w-8 bg-gradient-to-r from-[${colors.primary}]/0 via-[${colors.primary}]/20 to-[${colors.primary}]/0`} />
+            <div className={`absolute bottom-0 left-0 w-[1px] h-8 bg-gradient-to-t ${colors.gradient.from} ${colors.gradient.via} ${colors.gradient.to}`} />
+            <div className={`absolute bottom-0 left-0 h-[1px] w-8 bg-gradient-to-r ${colors.gradient.from} ${colors.gradient.via} ${colors.gradient.to}`} />
           </div>
         </div>
       </div>

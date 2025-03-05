@@ -89,6 +89,25 @@ module.exports = {
               '900': '#60442c',
               '950': '#332217',
             },
+            // Dialog-specific colors
+            danger: {
+              primary: '#ff4c2c',
+              light: '#ff4c2c20',
+              medium: '#ff4c2c40',
+              dark: '#ff4c2c60'
+            },
+            info: {
+              primary: '#60a5fa',
+              light: '#3b82f620',
+              medium: '#3b82f640',
+              dark: '#3b82f660'
+            },
+            warning: {
+              primary: '#fbbf24',
+              light: '#f59e0b20',
+              medium: '#f59e0b40',
+              dark: '#f59e0b60'
+            }
           }
         },
         typography: {
