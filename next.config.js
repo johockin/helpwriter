@@ -4,6 +4,11 @@ const nextConfig = {
   transpilePackages: ['@uiw/react-md-editor', '@uiw/react-markdown-preview'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+      
       config.module.rules.push({
         test: /\.css$/,
         use: ['style-loader', 'css-loader'],
@@ -17,12 +22,8 @@ const nextConfig = {
   },
   compress: true,
   images: {
-    loader: 'custom',
-    loaderFile: './netlify-image-loader.js',
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    unoptimized: true,
     domains: [],
-    formats: ['image/avif', 'image/webp'],
   },
   async headers() {
     return [
@@ -32,10 +33,6 @@ const nextConfig = {
           {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
-          },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains'
           },
           {
             key: 'X-Frame-Options',
@@ -48,20 +45,13 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin'
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()'
           }
         ],
       },
     ]
   },
   rewrites: async () => [],
-  experimental: {
-    optimizeCss: true,
-    scrollRestoration: true,
-  }
+  experimental: {}
 };
 
 module.exports = nextConfig;
