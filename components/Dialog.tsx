@@ -1,29 +1,33 @@
 import { useEffect, useRef } from 'react';
-import { FiAlertTriangle, FiRotateCcw, FiArrowLeft } from 'react-icons/fi';
+import { FiAlertTriangle, FiRotateCcw, FiArrowLeft, FiTrash2 } from 'react-icons/fi';
 
-interface ConfirmDialogProps {
+interface DialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message?: string;
   confirmText?: string;
   cancelText?: string;
-  type?: 'warning' | 'danger' | 'info';
-  icon?: 'warning' | 'reset' | 'back';
+  type?: 'warning' | 'danger' | 'info' | 'delete';
+  icon?: 'warning' | 'reset' | 'back' | 'delete';
+  projectTitle?: string;
+  children?: React.ReactNode;
 }
 
-export default function ConfirmDialog({ 
+export default function Dialog({ 
   isOpen, 
   onClose, 
   onConfirm, 
   title,
   message,
-  confirmText = 'CONFIRM',
+  confirmText,
   cancelText = 'CANCEL',
   type = 'warning',
-  icon = 'warning'
-}: ConfirmDialogProps) {
+  icon,
+  projectTitle,
+  children
+}: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,6 +51,7 @@ export default function ConfirmDialog({
   const getColors = () => {
     switch (type) {
       case 'danger':
+      case 'delete':
         return {
           primary: '#ff4c2c',
           border: 'border-[#ff4c2c]/20',
@@ -74,17 +79,21 @@ export default function ConfirmDialog({
   };
 
   const getIcon = () => {
-    switch (icon) {
+    switch (icon || type) {
       case 'reset':
         return <FiRotateCcw className="w-5 h-5" style={{ color: getColors().primary }} />;
       case 'back':
         return <FiArrowLeft className="w-5 h-5" style={{ color: getColors().primary }} />;
+      case 'delete':
+        return <FiTrash2 className="w-5 h-5" style={{ color: getColors().primary }} />;
       default:
         return <FiAlertTriangle className="w-5 h-5" style={{ color: getColors().primary }} />;
     }
   };
 
   const colors = getColors();
+  const defaultConfirmText = type === 'delete' ? 'CONFIRM DELETE' : 'CONFIRM';
+  const finalConfirmText = confirmText || defaultConfirmText;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -122,14 +131,27 @@ export default function ConfirmDialog({
           {/* Content */}
           <div className="p-6">
             <div className="space-y-4">
-              <div className={`${colors.bg} ${colors.border} rounded-lg p-4`}>
-                <div className="flex items-start gap-3">
-                  {getIcon()}
-                  <div className="text-sm text-tactical-sand-200">
-                    {message}
+              {projectTitle && (
+                <div className="text-tactical-sand-100 font-mono text-sm">
+                  Are you sure you want to delete project:
+                  <div className="mt-2 p-3 bg-tactical-earth-700/50 rounded-lg border border-[#ff4c2c]/20">
+                    <code className="text-[#ff4c2c]">{projectTitle}</code>
                   </div>
                 </div>
-              </div>
+              )}
+              
+              {message && (
+                <div className={`${colors.bg} ${colors.border} rounded-lg p-4`}>
+                  <div className="flex items-start gap-3">
+                    {getIcon()}
+                    <div className="text-sm text-tactical-sand-200">
+                      {message}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {children}
             </div>
           </div>
 
@@ -151,7 +173,7 @@ export default function ConfirmDialog({
                   className={`flex items-center gap-2 px-4 py-2 ${colors.bg} ${colors.hover} ${colors.border} rounded-lg text-sm font-mono ${colors.text} transition-all`}
                 >
                   {getIcon()}
-                  {confirmText}
+                  {finalConfirmText}
                 </button>
               </div>
             </div>

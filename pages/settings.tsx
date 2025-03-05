@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FiArrowLeft, FiSave, FiRotateCcw, FiChevronDown, FiChevronUp, FiAlertTriangle, FiCornerUpLeft, FiTrash2 } from 'react-icons/fi';
 import { useRouter } from 'next/router';
-import DeleteConfirmDialog from './components/DeleteConfirmDialog';
-import ConfirmDialog from './components/ConfirmDialog';
+import Dialog from '../components/Dialog';
 
 const defaultStyleInstructions = `My writing style draws from classical storytelling traditions while subverting modern tropes:
 
@@ -450,52 +449,51 @@ export default function Settings() {
         </div>
       </main>
 
-      {/* Confirmation Dialogs */}
-      <ConfirmDialog
+      {/* Reset Style Dialog */}
+      <Dialog
         isOpen={isResetStyleDialogOpen}
         onClose={() => setIsResetStyleDialogOpen(false)}
         onConfirm={handleConfirmResetStyle}
-        title="RESET STYLE PREFERENCES"
-        message="Are you sure you want to reset your writing style preferences to default? This will revert all customizations."
-        confirmText="RESET STYLE"
+        title="RESET STYLE INSTRUCTIONS"
         type="warning"
         icon="reset"
+        message="Are you sure you want to reset the style instructions to their default values? This action cannot be undone."
       />
 
-      <ConfirmDialog
+      {/* Reset System Dialog */}
+      <Dialog
         isOpen={isResetSystemDialogOpen}
         onClose={() => setIsResetSystemDialogOpen(false)}
         onConfirm={handleConfirmResetSystem}
-        title="RESET SYSTEM BEHAVIOR"
-        message="Are you sure you want to reset the system behavior to default? This will revert all AI assistant configurations."
-        confirmText="RESET SYSTEM"
+        title="RESET SYSTEM INSTRUCTIONS"
         type="warning"
         icon="reset"
+        message="Are you sure you want to reset the system instructions to their default values? This action cannot be undone."
       />
 
-      <ConfirmDialog
+      {/* Reset Technical Dialog */}
+      <Dialog
         isOpen={isResetTechnicalDialogOpen}
         onClose={() => setIsResetTechnicalDialogOpen(false)}
         onConfirm={handleConfirmResetTechnical}
-        title="RESET TECHNICAL INTEGRATION"
-        message="WARNING: Are you absolutely sure you want to reset the technical integration instructions? This will restore the default app functionality."
-        confirmText="RESET TECHNICAL"
-        type="danger"
+        title="RESET TECHNICAL INSTRUCTIONS"
+        type="warning"
         icon="reset"
+        message="Are you sure you want to reset the technical instructions to their default values? This action cannot be undone."
       />
 
-      <ConfirmDialog
+      {/* Leave Without Saving Dialog */}
+      <Dialog
         isOpen={isLeaveDialogOpen}
         onClose={() => setIsLeaveDialogOpen(false)}
         onConfirm={handleConfirmLeave}
         title="UNSAVED CHANGES"
-        message="You have unsaved changes. Are you sure you want to leave? All changes will be lost."
-        confirmText="LEAVE"
         type="warning"
         icon="back"
+        message="You have unsaved changes. Are you sure you want to leave? All changes will be lost."
       />
 
-      <ConfirmDialog
+      <Dialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleConfirmReset}

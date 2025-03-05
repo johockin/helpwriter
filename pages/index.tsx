@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FiSend, FiTrash2, FiDownload, FiCopy, FiBook, FiSettings, FiPlus, FiFolder, FiCornerUpLeft, FiCornerUpRight, FiArrowLeft, FiEdit2, FiEye, FiBold, FiItalic, FiList, FiLink } from 'react-icons/fi';
 import { useRouter } from 'next/router';
-import ConfirmDialog from './components/ConfirmDialog';
-import DeleteConfirmDialog from './components/DeleteConfirmDialog';
+import Dialog from '../components/Dialog';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -1069,14 +1068,16 @@ export default function Home() {
           </div>
         </main>
 
-        <DeleteConfirmDialog
+        <Dialog
           isOpen={isDeleteProjectDialogOpen}
           onClose={() => {
             setIsDeleteProjectDialogOpen(false);
             setProjectToDelete(null);
           }}
           onConfirm={handleConfirmDeleteProject}
-          projectTitle={projects.find(p => p.id === projectToDelete)?.title || ''}
+          title="CONFIRM DELETE"
+          type="delete"
+          projectTitle={projectToDelete ? projects.find(p => p.id === projectToDelete)?.title || '' : ''}
         />
       </div>
     </div>
