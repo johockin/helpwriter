@@ -1,10 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 const defaultStyleInstructions = `Let's have a conversation about your writing! I'd love to understand your creative vision and preferences better.
 
 Some things I'm curious about:
@@ -166,6 +162,17 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Validate API key presence
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ 
+      error: 'OpenAI API key is not configured' 
+    });
+  }
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

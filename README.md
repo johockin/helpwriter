@@ -45,6 +45,21 @@ Open [http://localhost:3001](http://localhost:3001) with your browser to see the
 - React Markdown Editor
 - React Icons
 
+## Environment Variables
+
+This application requires certain environment variables to be set up. Create a `.env.local` file in the root directory with the following variables:
+
+```bash
+# Required: Your OpenAI API key
+OPENAI_API_KEY=your_api_key_here
+```
+
+⚠️ **Security Note**: 
+- Never commit your `.env.local` file to version control
+- Keep your API keys private and secure
+- For production deployment, set environment variables in your Netlify dashboard
+- Rotate your API keys periodically for better security
+
 ## License
 
 MIT
