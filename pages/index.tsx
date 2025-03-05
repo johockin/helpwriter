@@ -839,7 +839,7 @@ export default function Home() {
                                 {new Date(chat.timestamp).toLocaleTimeString()}
                               </div>
                             </div>
-                            <div className="chat-message">{chat.message}</div>
+                            <div className="chat-message p-2 sm:p-3 md:p-4">{chat.message}</div>
                           </div>
                         </div>
                       ))}

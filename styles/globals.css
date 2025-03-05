@@ -8,40 +8,9 @@ body {
   min-height: 100vh;
 }
 
-/* Chat message styles */
-.chat-message {
-  @apply whitespace-pre-wrap font-mono;
-  font-size: 0.75rem; /* 12px base for very small screens */
-  line-height: 1.6;
-}
-
-/* Small screens */
-@media (min-width: 640px) {
+@layer components {
   .chat-message {
-    font-size: 0.875rem; /* 14px */
-  }
-}
-
-/* Medium screens */
-@media (min-width: 768px) {
-  .chat-message {
-    font-size: 1rem; /* 16px */
-  }
-}
-
-/* Large screens */
-@media (min-width: 1024px) {
-  .chat-message {
-    font-size: 1.125rem; /* 18px */
-    line-height: 1.7;
-  }
-}
-
-/* Extra large screens */
-@media (min-width: 1280px) {
-  .chat-message {
-    font-size: 1.25rem; /* 20px */
-    line-height: 1.8;
+    @apply whitespace-pre-wrap font-mono text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl leading-relaxed sm:leading-relaxed md:leading-relaxed lg:leading-relaxed xl:leading-relaxed;
   }
 }
 
