@@ -1,0 +1,19 @@
+[[redirects]]
+  from = "/_next/image/*"
+  to = "/.netlify/images"
+  status = 200
+  force = true
+  query = { url = ":url", w = ":width", q = ":quality" }
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs" 

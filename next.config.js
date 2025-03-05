@@ -3,27 +3,27 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@uiw/react-md-editor', '@uiw/react-markdown-preview'],
   webpack: (config, { isServer }) => {
-    // Handle CSS imports from node_modules
-    config.module.rules.push({
-      test: /\.css$/,
-      use: ['style-loader', 'css-loader'],
-      include: [
-        /node_modules\/@uiw\/react-md-editor/,
-        /node_modules\/@uiw\/react-markdown-preview/
-      ],
-    });
-
+    if (!isServer) {
+      config.module.rules.push({
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
+        include: [
+          /node_modules\/@uiw\/react-md-editor/,
+          /node_modules\/@uiw\/react-markdown-preview/
+        ],
+      });
+    }
     return config;
   },
-  // Enable compression
   compress: true,
-  // Optimize images
   images: {
-    domains: [],
+    loader: 'custom',
+    loaderFile: './netlify-image-loader.js',
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    domains: [],
+    formats: ['image/avif', 'image/webp'],
   },
-  // Add security headers
   async headers() {
     return [
       {
@@ -34,8 +34,8 @@ const nextConfig = {
             value: 'on'
           },
           {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block'
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains'
           },
           {
             key: 'X-Frame-Options',
@@ -47,11 +47,20 @@ const nextConfig = {
           },
           {
             key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
+            value: 'strict-origin-when-cross-origin'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()'
           }
         ],
       },
     ]
+  },
+  rewrites: async () => [],
+  experimental: {
+    optimizeCss: true,
+    scrollRestoration: true,
   }
 };
 
