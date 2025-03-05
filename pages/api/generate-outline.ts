@@ -1,27 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 
-// Rate limiting setup
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 10; // 10 requests per minute
-const requestCounts = new Map<string, { count: number; timestamp: number }>();
-
-function getRateLimitInfo(ip: string): { isAllowed: boolean; remainingRequests: number } {
-  const now = Date.now();
-  const requestInfo = requestCounts.get(ip);
-
-  if (!requestInfo || (now - requestInfo.timestamp) > RATE_LIMIT_WINDOW) {
-    requestCounts.set(ip, { count: 1, timestamp: now });
-    return { isAllowed: true, remainingRequests: MAX_REQUESTS - 1 };
-  }
-
-  if (requestInfo.count >= MAX_REQUESTS) {
-    return { isAllowed: false, remainingRequests: 0 };
-  }
-
-  requestInfo.count += 1;
-  return { isAllowed: true, remainingRequests: MAX_REQUESTS - requestInfo.count };
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const defaultStyleInstructions = `Let's have a conversation about your writing! I'd love to understand your creative vision and preferences better.
 
@@ -184,27 +166,6 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Rate limiting check
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-  const { isAllowed, remainingRequests } = getRateLimitInfo(ip.toString());
-  
-  res.setHeader('X-RateLimit-Remaining', remainingRequests.toString());
-  
-  if (!isAllowed) {
-    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
-  }
-
-  // Validate API key presence
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ 
-      error: 'OpenAI API key is not configured' 
-    });
-  }
-
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -218,7 +179,7 @@ export default async function handler(
       systemInstructions, 
       technicalInstructions,
       customInstructions,
-      isDocumentRequest = false
+      isDocumentRequest = false  // New flag to distinguish between chat and document requests
     } = req.body;
 
     if (!prompt) {
@@ -259,74 +220,59 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
       }
     ];
 
-    try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4-0125-preview",
-        messages,
-        temperature: 0.7,
-        max_tokens: 1500,
-      });
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-0125-preview",
+      messages,
+      temperature: 0.7,
+      max_tokens: 1500,
+    });
 
-      if (!completion.choices[0]?.message?.content) {
-        throw new Error('No response content received from OpenAI');
-      }
-
-      const responseContent = completion.choices[0].message.content;
+    const responseContent = completion.choices[0].message.content || '';
+    
+    // Only process title and outline for document requests
+    if (isDocumentRequest) {
+      let outline = responseContent;
+      let suggestedTitle: string | null = null;
       
-      // Only process title and outline for document requests
-      if (isDocumentRequest) {
-        let outline = responseContent;
-        let suggestedTitle: string | null = null;
-        
-        // Look for title suggestions in various formats
-        const titlePatterns = [
-          /Suggested Title:([^\n]+)/i,
-          /Title:([^\n]+)/i,
-          /Proposed Title:([^\n]+)/i,
-          /Document Title:([^\n]+)/i
-        ];
+      // Look for title suggestions in various formats
+      const titlePatterns = [
+        /Suggested Title:([^\n]+)/i,
+        /Title:([^\n]+)/i,
+        /Proposed Title:([^\n]+)/i,
+        /Document Title:([^\n]+)/i
+      ];
 
-        for (const pattern of titlePatterns) {
-          const match = responseContent.match(pattern);
-          if (match) {
-            suggestedTitle = formatTitle(match[1].trim());
-            // Remove the title line from the outline
-            outline = responseContent.replace(pattern, '').trim();
-            break;
-          }
+      for (const pattern of titlePatterns) {
+        const match = responseContent.match(pattern);
+        if (match) {
+          suggestedTitle = formatTitle(match[1].trim());
+          // Remove the title line from the outline
+          outline = responseContent.replace(pattern, '').trim();
+          break;
         }
-
-        // If no explicit title suggestion found, try to extract one from the first line
-        if (!suggestedTitle && !currentTitle) {
-          const firstLine = outline.split('\n')[0].trim();
-          if (firstLine && !firstLine.startsWith('-') && !firstLine.startsWith('•')) {
-            suggestedTitle = formatTitle(firstLine);
-            outline = outline.split('\n').slice(1).join('\n').trim();
-          }
-        }
-
-        return res.status(200).json({ 
-          outline,
-          suggestedTitle 
-        });
-      } else {
-        // For chat interactions, just return the response content
-        return res.status(200).json({
-          chatResponse: responseContent
-        });
       }
-    } catch (apiError: any) {
-      console.error('OpenAI API Error:', apiError);
-      return res.status(500).json({ 
-        error: 'Error communicating with OpenAI',
-        details: apiError.message || 'Unknown API error'
+
+      // If no explicit title suggestion found, try to extract one from the first line
+      if (!suggestedTitle && !currentTitle) {
+        const firstLine = outline.split('\n')[0].trim();
+        if (firstLine && !firstLine.startsWith('-') && !firstLine.startsWith('•')) {
+          suggestedTitle = formatTitle(firstLine);
+          outline = outline.split('\n').slice(1).join('\n').trim();
+        }
+      }
+
+      return res.status(200).json({ 
+        outline,
+        suggestedTitle 
+      });
+    } else {
+      // For chat interactions, just return the response content
+      return res.status(200).json({
+        chatResponse: responseContent
       });
     }
-  } catch (error: any) {
-    console.error('Server Error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error.message || 'Unknown error occurred'
-    });
+  } catch (error) {
+    console.error('Error:', error);
+    return res.status(500).json({ error: 'Error generating response' });
   }
 } 

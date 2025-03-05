@@ -835,7 +835,7 @@ export default function Home() {
                                 {new Date(chat.timestamp).toLocaleTimeString()}
                               </div>
                             </div>
-                            <div className="whitespace-pre-wrap text-xs leading-relaxed font-mono">{chat.message}</div>
+                            <div className="chat-message">{chat.message}</div>
                           </div>
                         </div>
                       ))}

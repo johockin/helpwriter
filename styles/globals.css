@@ -8,6 +8,18 @@ body {
   min-height: 100vh;
 }
 
+/* Chat message styles */
+.chat-message {
+  @apply whitespace-pre-wrap text-xs leading-relaxed font-mono;
+}
+
+@media (min-width: 768px) {
+  .chat-message {
+    font-size: 0.875rem; /* 14px, about 15% larger than text-xs (12px) */
+    line-height: 1.6;
+  }
+}
+
 /* Improve scrollbar appearance */
 ::-webkit-scrollbar {
   width: 8px;
