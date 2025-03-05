@@ -254,6 +254,7 @@ export default async function handler(
       systemInstructions, 
       technicalInstructions,
       customInstructions,
+      chatHistory = [],
       isDocumentRequest = false
     } = req.body;
 
@@ -265,8 +266,17 @@ export default async function handler(
       type: isDocumentRequest ? 'document' : 'chat',
       hasCurrentOutline: !!currentOutline,
       hasCurrentTitle: !!currentTitle,
-      promptLength: prompt.length
+      promptLength: prompt.length,
+      chatHistoryLength: chatHistory.length
     });
+
+    // Format chat history for context
+    const formattedChatHistory = chatHistory
+      .slice(-10) // Only include last 10 messages for context
+      .map((msg: any) => ({
+        role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+        content: msg.message
+      }));
 
     const messages = [
       {
@@ -290,8 +300,15 @@ When suggesting a title:
 4. Avoid literal descriptions
 5. Be willing to iterate and refine based on feedback
 
+Current Context:
+${currentTitle ? `Current Title: ${currentTitle}` : ''}
+${currentOutline ? `Current Outline:\n${currentOutline}` : ''}
+
 IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured document format.' : 'This is a chat interaction - be conversational and engaging.'}`
       },
+      // Include chat history for context
+      ...formattedChatHistory,
+      // Add the current prompt
       {
         role: "user" as const,
         content: isDocumentRequest

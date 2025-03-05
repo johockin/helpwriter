@@ -262,7 +262,8 @@ export default function Home() {
         prompt,
         currentOutline: outline,
         currentTitle: title,
-        hasCustomInstructions: !!currentProject?.customInstructions
+        hasCustomInstructions: !!currentProject?.customInstructions,
+        chatHistoryLength: chatHistory.length
       });
 
       const response = await fetch('/api/generate-outline', {
@@ -278,6 +279,7 @@ export default function Home() {
           systemInstructions: localStorage.getItem('systemInstructions'),
           technicalInstructions: localStorage.getItem('technicalInstructions'),
           customInstructions: currentProject?.customInstructions,
+          chatHistory: chatHistory,
           isDocumentRequest: prompt.toLowerCase().includes('outline') || prompt.toLowerCase().includes('document')
         }),
       });
@@ -342,6 +344,7 @@ export default function Home() {
           systemInstructions: localStorage.getItem('systemInstructions'),
           technicalInstructions: localStorage.getItem('technicalInstructions'),
           customInstructions: projects.find(p => p.id === currentProjectId)?.customInstructions,
+          chatHistory: newChatHistory,
           isDocumentRequest: input.trim().toLowerCase().includes('outline') || input.trim().toLowerCase().includes('document')
         }),
       });
