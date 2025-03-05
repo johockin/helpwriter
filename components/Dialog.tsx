@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { FiAlertTriangle, FiRotateCcw, FiArrowLeft, FiTrash2 } from 'react-icons/fi';
 
 interface DialogProps {
@@ -13,6 +13,9 @@ interface DialogProps {
   icon?: 'warning' | 'reset' | 'back' | 'delete';
   projectTitle?: string;
   children?: React.ReactNode;
+  operationId?: string;
+  disableBackdropClick?: boolean;
+  disableEscapeKey?: boolean;
 }
 
 export default function Dialog({ 
@@ -26,25 +29,51 @@ export default function Dialog({
   type = 'warning',
   icon,
   projectTitle,
-  children
+  children,
+  operationId,
+  disableBackdropClick = false,
+  disableEscapeKey = false
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Generate a stable operation ID based on title and type
+  const generatedOperationId = useMemo(() => {
+    const base = `${type.toUpperCase()}_${title.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`;
+    return operationId || base.substring(0, 12);
+  }, [type, title, operationId]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (!disableEscapeKey && e.key === 'Escape') onClose();
+    };
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        confirmButtonRef.current?.click();
+      }
     };
     
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
+      document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }
     
     return () => {
       document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, disableEscapeKey]);
+
+  // Focus management
+  useEffect(() => {
+    if (isOpen && confirmButtonRef.current) {
+      confirmButtonRef.current.focus();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -86,13 +115,17 @@ export default function Dialog({
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-tactical-earth-900/95 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={() => !disableBackdropClick && onClose()}
       />
       
       {/* Modal */}
       <div 
         ref={dialogRef}
         className="relative w-full max-w-lg mx-4 animate-fade-in"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`dialog-title-${generatedOperationId}`}
+        aria-describedby={message ? `dialog-message-${generatedOperationId}` : undefined}
       >
         <div className={`relative bg-tactical-earth-800/90 rounded-xl ${colors.border} overflow-hidden`}>
           {/* Status Bar */}
@@ -108,8 +141,15 @@ export default function Dialog({
                 </div>
               </div>
               <div className="flex flex-col">
-                <h2 className={`text-sm font-medium ${colors.text} tracking-wide font-mono`}>{title}</h2>
-                <div className={`text-xs ${colors.text}/70 font-mono mt-1`}>OPERATION ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</div>
+                <h2 
+                  id={`dialog-title-${generatedOperationId}`}
+                  className={`text-sm font-medium ${colors.text} tracking-wide font-mono`}
+                >
+                  {title}
+                </h2>
+                <div className={`text-xs ${colors.text}/70 font-mono mt-1`}>
+                  OPERATION ID: {generatedOperationId}
+                </div>
               </div>
             </div>
           </div>
@@ -127,7 +167,10 @@ export default function Dialog({
               )}
               
               {message && (
-                <div className={`${colors.bg} ${colors.border} rounded-lg p-4`}>
+                <div 
+                  id={`dialog-message-${generatedOperationId}`}
+                  className={`${colors.bg} ${colors.border} rounded-lg p-4`}
+                >
                   <div className="flex items-start gap-3">
                     <div className={colors.primary}>{getIcon()}</div>
                     <div className="text-sm text-tactical-sand-200">
@@ -145,7 +188,7 @@ export default function Dialog({
           <div className={`p-6 bg-tactical-earth-900/30 border-t ${colors.border}`}>
             <div className="flex items-center justify-between gap-4">
               <div className="text-[10px] font-mono text-tactical-sand-300/60 tracking-wider">
-                ⌘ AWAITING CONFIRMATION
+                ⌘ + ↵ TO CONFIRM
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -155,6 +198,7 @@ export default function Dialog({
                   {cancelText}
                 </button>
                 <button
+                  ref={confirmButtonRef}
                   onClick={onConfirm}
                   className={`flex items-center gap-2 px-4 py-2 ${colors.bg} ${colors.hover} ${colors.border} rounded-lg text-sm font-mono ${colors.text} transition-all`}
                 >
