@@ -821,7 +821,7 @@ export default function Home() {
                           className={`flex ${chat.sender === 'ai' ? 'justify-start' : 'justify-end'} mb-4`}
                         >
                           <div
-                            className={`max-w-[85%] p-4 rounded-xl shadow-lg relative ${
+                            className={`max-w-[85%] p-4 sm:p-5 md:p-6 rounded-xl shadow-lg relative ${
                               chat.sender === 'ai'
                                 ? 'bg-tactical-earth-600/95 text-tactical-sand-100 border border-tactical-sand-500/30'
                                 : 'bg-tactical-earth-500/95 text-tactical-sand-100 border border-tactical-sand-500/40'
