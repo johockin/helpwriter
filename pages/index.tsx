@@ -325,23 +325,47 @@ export default function Home() {
       setChatHistory(newChatHistory);
       setInput(''); // Clear input early for better UX
 
-      const { outline: generatedOutline, suggestedTitle } = await generateOutline(input.trim());
+      const response = await fetch('/api/generate-outline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          prompt: input.trim(),
+          currentOutline: outline,
+          currentTitle: title,
+          styleInstructions: localStorage.getItem('styleInstructions'),
+          systemInstructions: localStorage.getItem('systemInstructions'),
+          technicalInstructions: localStorage.getItem('technicalInstructions'),
+          customInstructions: projects.find(p => p.id === currentProjectId)?.customInstructions,
+          isDocumentRequest: input.trim().toLowerCase().includes('outline') || input.trim().toLowerCase().includes('document')
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('API Response:', data);
 
       // Create AI response message
-      let aiMessage = '';
-      let shouldUpdateOutline = false;
-      let shouldUpdateTitle = false;
-
-      if (generatedOutline) {
-        shouldUpdateOutline = true;
+      let aiMessage: string;
+      
+      if (data.chatResponse) {
+        // Handle chat response
+        aiMessage = data.chatResponse;
+      } else if (data.outline) {
+        // Handle outline response
+        setOutline(data.outline);
         aiMessage = `I've updated the outline based on your feedback.`;
         
-        if (suggestedTitle && suggestedTitle !== title) {
-          shouldUpdateTitle = true;
-          aiMessage += ` I've also updated the title to better reflect the content: "${suggestedTitle}"`;
+        if (data.suggestedTitle && data.suggestedTitle !== title) {
+          setTitle(data.suggestedTitle);
+          aiMessage += ` I've also updated the title to better reflect the content: "${data.suggestedTitle}"`;
         }
       } else {
-        aiMessage = 'I apologize, but I encountered an error generating the outline. Please try again.';
+        throw new Error('Invalid API response format');
       }
 
       const aiChatMessage: ChatMessage = {
@@ -351,13 +375,6 @@ export default function Home() {
         timestamp: Date.now(),
       };
 
-      // Update all states together
-      if (shouldUpdateOutline) {
-        setOutline(generatedOutline);
-      }
-      if (shouldUpdateTitle && suggestedTitle) {
-        setTitle(suggestedTitle);
-      }
       setChatHistory([...newChatHistory, aiChatMessage]);
 
     } catch (error) {
@@ -366,7 +383,7 @@ export default function Home() {
       const aiChatMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        message: `I apologize, but I encountered an error: ${errorMessage}. Please make sure you have configured your OpenAI API key in the .env.local file.`,
+        message: `I apologize, but I encountered an error: ${errorMessage}. Please try again.`,
         timestamp: Date.now(),
       };
       setChatHistory([...chatHistory, userMessage, aiChatMessage]);
