@@ -8,16 +8,33 @@ const nextConfig = {
         ...config.resolve.fallback,
         fs: false,
       };
-      
-      config.module.rules.push({
+    }
+    
+    // Add CSS handling for both global and module CSS
+    config.module.rules.push(
+      {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader'],
+        use: [
+          'style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              importLoaders: 1,
+              modules: {
+                auto: true,
+              },
+            },
+          },
+          'postcss-loader',
+        ],
         include: [
           /node_modules\/@uiw\/react-md-editor/,
-          /node_modules\/@uiw\/react-markdown-preview/
+          /node_modules\/@uiw\/react-markdown-preview/,
+          /styles\/.*\.css$/,
         ],
-      });
-    }
+      }
+    );
+
     return config;
   },
   compress: true,
