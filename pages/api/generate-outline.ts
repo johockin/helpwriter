@@ -1,6 +1,28 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 
+// Rate limiting setup
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS = 10; // 10 requests per minute
+const requestCounts = new Map<string, { count: number; timestamp: number }>();
+
+function getRateLimitInfo(ip: string): { isAllowed: boolean; remainingRequests: number } {
+  const now = Date.now();
+  const requestInfo = requestCounts.get(ip);
+
+  if (!requestInfo || (now - requestInfo.timestamp) > RATE_LIMIT_WINDOW) {
+    requestCounts.set(ip, { count: 1, timestamp: now });
+    return { isAllowed: true, remainingRequests: MAX_REQUESTS - 1 };
+  }
+
+  if (requestInfo.count >= MAX_REQUESTS) {
+    return { isAllowed: false, remainingRequests: 0 };
+  }
+
+  requestInfo.count += 1;
+  return { isAllowed: true, remainingRequests: MAX_REQUESTS - requestInfo.count };
+}
+
 const defaultStyleInstructions = `Let's have a conversation about your writing! I'd love to understand your creative vision and preferences better.
 
 Some things I'm curious about:
@@ -162,6 +184,16 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Rate limiting check
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const { isAllowed, remainingRequests } = getRateLimitInfo(ip.toString());
+  
+  res.setHeader('X-RateLimit-Remaining', remainingRequests.toString());
+  
+  if (!isAllowed) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
   // Validate API key presence
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ 
