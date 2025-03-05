@@ -62,30 +62,38 @@ export default function Home() {
     }
   }, [currentProjectId]);
 
-  // Load projects on mount
+  // Load projects on mount with better error handling
   useEffect(() => {
     try {
+      console.log('Loading projects from localStorage');
       const savedProjects = localStorage.getItem('projects');
       const lastProjectId = localStorage.getItem('currentProjectId');
       
       if (savedProjects) {
         const parsedProjects = JSON.parse(savedProjects);
-        // Migrate existing projects to include history
+        console.log('Found projects:', parsedProjects.length);
+        
+        // Migrate and validate existing projects
         const migratedProjects = parsedProjects.map((project: Project) => ({
           ...project,
           outlineHistory: project.outlineHistory || [project.outline || ''],
-          currentHistoryIndex: project.currentHistoryIndex || 0
+          currentHistoryIndex: project.currentHistoryIndex || 0,
+          chatHistory: Array.isArray(project.chatHistory) ? project.chatHistory : [],
+          customInstructions: project.customInstructions || ''
         }));
+
         setProjects(migratedProjects);
         
+        // Load the last active project or most recent
         if (lastProjectId && migratedProjects.find((p: Project) => p.id === lastProjectId)) {
+          console.log('Loading last active project:', lastProjectId);
           const currentProject = migratedProjects.find((p: Project) => p.id === lastProjectId);
           setCurrentProjectId(lastProjectId);
           setTitle(currentProject.title);
           setOutline(currentProject.outline);
           setChatHistory(currentProject.chatHistory);
         } else if (migratedProjects.length > 0) {
-          // Load most recently modified project if last project not found
+          console.log('Loading most recent project');
           const mostRecent = migratedProjects.reduce((prev: Project, current: Project) => 
             (current.lastModified > prev.lastModified) ? current : prev
           );
@@ -94,9 +102,11 @@ export default function Home() {
           setOutline(mostRecent.outline);
           setChatHistory(mostRecent.chatHistory);
         } else {
+          console.log('No projects found, creating new');
           createNewProject();
         }
       } else {
+        console.log('No saved projects, creating new');
         createNewProject();
       }
     } catch (error) {
@@ -129,21 +139,32 @@ export default function Home() {
       const currentProject = projects.find(p => p.id === currentProjectId);
       if (!currentProject) return;
 
-      const updatedProjects = projects.map(project => 
-        project.id === currentProjectId
-          ? {
-              ...project,
-              title,
-              outline,
-              chatHistory,
-              lastModified: Date.now(),
-              // Ensure history properties exist
-              outlineHistory: project.outlineHistory || [outline],
-              currentHistoryIndex: project.currentHistoryIndex || 0
-            }
-          : project
-      );
-      setProjects(updatedProjects);
+      // Create a new project object with all updates
+      const updatedProject = {
+        ...currentProject,
+        title,
+        outline,
+        chatHistory,
+        lastModified: Date.now(),
+        outlineHistory: currentProject.outlineHistory || [outline],
+        currentHistoryIndex: currentProject.currentHistoryIndex || 0
+      };
+
+      // Only update if there are actual changes
+      if (JSON.stringify(currentProject) !== JSON.stringify(updatedProject)) {
+        console.log('Updating project:', { id: currentProjectId, title, chatHistory: chatHistory.length });
+        const updatedProjects = projects.map(project => 
+          project.id === currentProjectId ? updatedProject : project
+        );
+        setProjects(updatedProjects);
+        
+        // Save to localStorage
+        try {
+          localStorage.setItem('projects', JSON.stringify(updatedProjects));
+        } catch (error) {
+          console.error('Error saving to localStorage:', error);
+        }
+      }
     }
   }, [outline, title, chatHistory, currentProjectId]);
 
@@ -233,6 +254,13 @@ export default function Home() {
   const generateOutline = async (prompt: string): Promise<{ outline: string; suggestedTitle: string | null }> => {
     try {
       const currentProject = projects.find(p => p.id === currentProjectId);
+      console.log('Generating outline with:', {
+        prompt,
+        currentOutline: outline,
+        currentTitle: title,
+        hasCustomInstructions: !!currentProject?.customInstructions
+      });
+
       const response = await fetch('/api/generate-outline', {
         method: 'POST',
         headers: {
@@ -245,25 +273,38 @@ export default function Home() {
           styleInstructions: localStorage.getItem('styleInstructions'),
           systemInstructions: localStorage.getItem('systemInstructions'),
           technicalInstructions: localStorage.getItem('technicalInstructions'),
-          customInstructions: currentProject?.customInstructions
+          customInstructions: currentProject?.customInstructions,
+          isDocumentRequest: prompt.toLowerCase().includes('outline') || prompt.toLowerCase().includes('document')
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate outline');
+        const errorData = await response.json().catch(() => null);
+        console.error('API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
+        throw new Error(
+          errorData?.error || 
+          `API Error: ${response.status} ${response.statusText}`
+        );
       }
 
       const data = await response.json();
+      console.log('API Response:', data);
+
+      if (!data.outline && !data.chatResponse) {
+        throw new Error('Invalid API response format');
+      }
+
       return {
-        outline: data.outline,
+        outline: data.outline || '',
         suggestedTitle: data.suggestedTitle
       };
     } catch (error) {
-      console.error('Error generating outline:', error);
-      return {
-        outline: 'Error generating outline. Please try again.',
-        suggestedTitle: null
-      };
+      console.error('Error in generateOutline:', error);
+      throw error;
     }
   };
 
@@ -271,7 +312,6 @@ export default function Home() {
     if (input.trim() === '' || isLoading) return;
 
     setIsLoading(true);
-
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -279,77 +319,59 @@ export default function Home() {
       timestamp: Date.now(),
     };
 
-    const newChatHistory = [...chatHistory, userMessage];
-    setChatHistory(newChatHistory);
-
     try {
-      const currentProject = projects.find(p => p.id === currentProjectId);
-      const response = await fetch('/api/generate-outline', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          prompt: input.trim(),
-          currentOutline: outline,
-          currentTitle: title,
-          styleInstructions: localStorage.getItem('styleInstructions'),
-          systemInstructions: localStorage.getItem('systemInstructions'),
-          technicalInstructions: localStorage.getItem('technicalInstructions'),
-          customInstructions: currentProject?.customInstructions,
-          isDocumentRequest: input.trim().toLowerCase().includes('outline') || input.trim().toLowerCase().includes('document')
-        }),
-      });
+      // Add user message immediately
+      const newChatHistory = [...chatHistory, userMessage];
+      setChatHistory(newChatHistory);
+      setInput(''); // Clear input early for better UX
 
-      if (!response.ok) {
-        throw new Error('Failed to generate response');
-      }
+      const { outline: generatedOutline, suggestedTitle } = await generateOutline(input.trim());
 
-      const data = await response.json();
-      
-      if (data.chatResponse) {
-        // Handle chat response
-        const aiChatMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          sender: 'ai',
-          message: data.chatResponse,
-          timestamp: Date.now(),
-        };
-        setChatHistory([...newChatHistory, aiChatMessage]);
-      } else {
-        // Handle document response
-        const { outline: generatedOutline, suggestedTitle } = data;
-        let aiMessage = `I've updated the outline based on your feedback.`;
+      // Create AI response message
+      let aiMessage = '';
+      let shouldUpdateOutline = false;
+      let shouldUpdateTitle = false;
+
+      if (generatedOutline) {
+        shouldUpdateOutline = true;
+        aiMessage = `I've updated the outline based on your feedback.`;
         
         if (suggestedTitle && suggestedTitle !== title) {
-          setTitle(suggestedTitle);
-          aiMessage += ` I've also updated the title to better reflect the content: ${suggestedTitle}`;
+          shouldUpdateTitle = true;
+          aiMessage += ` I've also updated the title to better reflect the content: "${suggestedTitle}"`;
         }
-
-        const aiChatMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          sender: 'ai',
-          message: aiMessage,
-          timestamp: Date.now(),
-        };
-
-        setChatHistory([...newChatHistory, aiChatMessage]);
-        setOutline(generatedOutline);
+      } else {
+        aiMessage = 'I apologize, but I encountered an error generating the outline. Please try again.';
       }
-    } catch (error) {
-      console.error('Error generating AI response:', error);
-      
-      const errorMessage: ChatMessage = {
+
+      const aiChatMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        message: 'I apologize, but I encountered an error. Please try again.',
+        message: aiMessage,
         timestamp: Date.now(),
       };
-      
-      setChatHistory([...newChatHistory, errorMessage]);
+
+      // Update all states together
+      if (shouldUpdateOutline) {
+        setOutline(generatedOutline);
+      }
+      if (shouldUpdateTitle && suggestedTitle) {
+        setTitle(suggestedTitle);
+      }
+      setChatHistory([...newChatHistory, aiChatMessage]);
+
+    } catch (error) {
+      console.error('Error in handleSend:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      const aiChatMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'ai',
+        message: `I apologize, but I encountered an error: ${errorMessage}. Please make sure you have configured your OpenAI API key in the .env.local file.`,
+        timestamp: Date.now(),
+      };
+      setChatHistory([...chatHistory, userMessage, aiChatMessage]);
     } finally {
       setIsLoading(false);
-      setInput('');
     }
   };
 

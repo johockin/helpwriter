@@ -1,9 +1,20 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize OpenAI with error handling
+const initializeOpenAI = () => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error('OpenAI API Key Error: Key not found in environment variables');
+    throw new Error('OpenAI API key is not configured. Please check your environment variables in both development (.env.local) and production (Netlify) environments.');
+  }
+  try {
+    return new OpenAI({ apiKey });
+  } catch (error) {
+    console.error('OpenAI Client Error:', error);
+    throw new Error('Failed to initialize OpenAI client. Please check your API key configuration.');
+  }
+};
 
 const defaultStyleInstructions = `Let's have a conversation about your writing! I'd love to understand your creative vision and preferences better.
 
@@ -171,6 +182,18 @@ export default async function handler(
   }
 
   try {
+    // Initialize OpenAI with enhanced error handling
+    let openai;
+    try {
+      openai = initializeOpenAI();
+    } catch (error) {
+      console.error('OpenAI Initialization Error:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Failed to initialize OpenAI',
+        details: 'Please ensure your OpenAI API key is properly configured in your environment variables.'
+      });
+    }
+
     const { 
       prompt, 
       currentOutline, 
@@ -179,12 +202,19 @@ export default async function handler(
       systemInstructions, 
       technicalInstructions,
       customInstructions,
-      isDocumentRequest = false  // New flag to distinguish between chat and document requests
+      isDocumentRequest = false
     } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
+
+    console.log('Processing request:', {
+      type: isDocumentRequest ? 'document' : 'chat',
+      hasCurrentOutline: !!currentOutline,
+      hasCurrentTitle: !!currentTitle,
+      promptLength: prompt.length
+    });
 
     const messages = [
       {
@@ -220,6 +250,7 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
       }
     ];
 
+    console.log('Sending request to OpenAI...');
     const completion = await openai.chat.completions.create({
       model: "gpt-4-0125-preview",
       messages,
@@ -228,6 +259,7 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
     });
 
     const responseContent = completion.choices[0].message.content || '';
+    console.log('Received response from OpenAI');
     
     // Only process title and outline for document requests
     if (isDocumentRequest) {
@@ -252,27 +284,27 @@ IMPORTANT: ${isDocumentRequest ? 'This is a document request - use structured do
         }
       }
 
-      // If no explicit title suggestion found, try to extract one from the first line
-      if (!suggestedTitle && !currentTitle) {
-        const firstLine = outline.split('\n')[0].trim();
-        if (firstLine && !firstLine.startsWith('-') && !firstLine.startsWith('•')) {
-          suggestedTitle = formatTitle(firstLine);
-          outline = outline.split('\n').slice(1).join('\n').trim();
-        }
-      }
+      console.log('Processed response:', {
+        hasTitle: !!suggestedTitle,
+        outlineLength: outline.length
+      });
 
-      return res.status(200).json({ 
+      return res.status(200).json({
         outline,
-        suggestedTitle 
+        suggestedTitle
       });
     } else {
-      // For chat interactions, just return the response content
+      // For chat responses, return the content directly
       return res.status(200).json({
         chatResponse: responseContent
       });
     }
   } catch (error) {
-    console.error('Error:', error);
-    return res.status(500).json({ error: 'Error generating response' });
+    console.error('API Error:', error);
+    // Send a more detailed error response
+    return res.status(502).json({
+      error: error instanceof Error ? error.message : 'An unexpected error occurred',
+      details: error instanceof Error ? error.stack : undefined
+    });
   }
 } 
